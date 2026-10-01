@@ -85,7 +85,7 @@ footer{padding:26px 0 50px;color:var(--mute);font-size:13.5px;display:flex;justi
     <div><span class="k">Pool</span><select id="poolSel" style="margin-top:6px"></select></div>
     <div><span class="k" id="r0k">Reserve 0</span><b id="r0">-</b></div>
     <div><span class="k" id="r1k">Reserve 1</span><b id="r1">-</b></div>
-    <div><span class="k">Spot price</span><b id="spot">-</b></div>
+    <div><span class="k" id="spotk">Spot price</span><b id="spot">-</b></div>
     <div><span class="k">Block</span><b id="blk">-</b></div>
   </section>
 
@@ -244,7 +244,7 @@ async function loadPool() {
   $('#r0k').textContent = `Reserve · ${p.t[0][0]}`; $('#r1k').textContent = `Reserve · ${p.t[1][0]}`;
   $('#r0').textContent = fmt(toF(st.r[0], p.t[0][1])); $('#r1').textContent = fmt(toF(st.r[1], p.t[1][1]));
   const s = sides();
-  const sp = priceBinA(); $('#spot').textContent = `${sp >= 1 ? sp.toLocaleString('en-US', { maximumFractionDigits: 2 }) : sp.toPrecision(4)} ${s.A[0]}/${s.B[0]}`;
+  const sp = priceBinA(); $('#spotk').textContent = `Spot · ${s.A[0]} per ${s.B[0]}`; $('#spot').textContent = sp >= 1 ? sp.toLocaleString('en-US', { maximumFractionDigits: 2 }) : sp.toPrecision(4);
   $('#blk').textContent = parseInt(blk, 16).toLocaleString('en-US');
 }
 async function loadCex() {
@@ -288,7 +288,7 @@ function swap() {
 }
 function drawCurve(x, y, a, out, inN, outN) {
   const W = 560, H = 300, L = 54, B = 34, k = x * y;
-  const span = Math.max(a * 2.2, x * 0.08), xmin = Math.max(x * 0.05, x - span * 0.6), xmax = x + a + span;
+  const span = Math.max(a * 3, x * 0.6), xmin = Math.max(x * 0.15, x - span * 0.5), xmax = x + a + span;
   const ymax = (k / xmin) * 1.04, ymin0 = k / xmax * 0.9, sx = v => L + (v - xmin) / (xmax - xmin) * (W - L - 16), sy = v => H - B - (v - ymin0) / (ymax - ymin0) * (H - B - 14);
   let path = '';
   for (let i = 0; i <= 120; i++) { const xv = xmin + (xmax - xmin) * i / 120; path += (i ? 'L' : 'M') + sx(xv).toFixed(1) + ',' + sy(k / xv).toFixed(1); }
@@ -330,7 +330,7 @@ function sand() {
     <line x1="${L}" y1="${sy(0)}" x2="${W - 10}" y2="${sy(0)}" stroke="#2a2f26"/>
     <polyline points="${pts.map(p => sx(p[0]).toFixed(1) + ',' + sy(p[1]).toFixed(1)).join(' ')}" fill="none" stroke="#c6f05a" stroke-width="2"/>
     <line x1="${sx(xm)}" y1="12" x2="${sx(xm)}" y2="${H - Bt}" stroke="#ff7a66" stroke-dasharray="3 4"/>
-    <text x="${sx(xm) - 6}" y="24" fill="#ff7a66" font-family="Fragment Mono" font-size="10.5" text-anchor="end">victim's limit</text>
+    <text x="${sx(xm) - 6}" y="${H - Bt - 8}" fill="#ff7a66" font-family="Fragment Mono" font-size="10.5" text-anchor="end">victim's limit</text>
     <circle cx="${bx}" cy="${by}" r="5" fill="#e9ecdf"/>
     <text x="${L}" y="${H - 8}" fill="#8d9483" font-family="Fragment Mono" font-size="10.5">front-run size (${A}) →</text>
     <text x="${L - 6}" y="${sy(0) + 4}" fill="#8d9483" font-family="Fragment Mono" font-size="10" text-anchor="end">$0</text>
