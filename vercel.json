@@ -1,0 +1,1 @@
+{ "framework": null, "installCommand": "echo static", "buildCommand": "", "outputDirectory": "." , "cleanUrls": true }

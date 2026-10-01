@@ -1,0 +1,409 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AMM Lab · swaps, sandwiches, arbitrage, impermanent loss</title>
+<meta name="description" content="Live Uniswap V2 reserves from Ethereum mainnet, and the math of what happens to them: price impact, optimal sandwich attacks, CEX arbitrage and impermanent loss. Backed by a Solidity pool whose tests replay the same attack on-chain.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22%3E%3Crect width=%2232%22 height=%2232%22 fill=%22%230e100d%22/%3E%3Cpath d=%22M6 4c0 16 6 22 22 22%22 fill=%22none%22 stroke=%22%23c6f05a%22 stroke-width=%223%22/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@400;500;600;700&family=Fragment+Mono&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0e100d; --panel:#151813; --line:#2a2f26; --ink:#e9ecdf; --mute:#8d9483; --lime:#c6f05a; --lime2:#9cc23c; --red:#ff7a66; --amber:#f2c14e;
+  --sans:'Familjen Grotesk',sans-serif; --mono:'Fragment Mono',monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{background:var(--bg)}
+body{background:var(--bg);color:var(--ink);font:400 15px/1.6 var(--sans);-webkit-font-smoothing:antialiased}
+a{color:var(--lime)}
+.wrap{max-width:1240px;margin:0 auto;padding:0 28px}
+.mono{font-family:var(--mono)}
+.k{font:400 11px/1.4 var(--mono);text-transform:uppercase;letter-spacing:.08em;color:var(--mute)}
+
+.top{display:grid;grid-template-columns:auto 1fr;gap:40px;align-items:end;padding:38px 0 26px;border-bottom:1px solid var(--line)}
+.top h1{font:700 clamp(54px,8vw,112px)/.86 var(--sans);letter-spacing:-.035em}
+.top h1 span{color:var(--lime)}
+.top p{max-width:60ch;color:#c4c9b8;font-size:16px}
+
+/* pool strip */
+.pool{display:grid;grid-template-columns:260px repeat(4,1fr);border-bottom:1px solid var(--line)}
+.pool>div{padding:16px 18px;border-right:1px solid var(--line)}
+.pool>div:last-child{border-right:0}
+.pool b{display:block;font:500 22px/1.2 var(--mono);margin-top:4px;word-break:break-all}
+select,input{font:400 14px var(--mono);background:var(--bg);color:var(--ink);border:1px solid var(--line);padding:9px 10px;width:100%}
+select:focus,input:focus{outline:1px solid var(--lime);border-color:var(--lime)}
+
+.grid{display:grid;grid-template-columns:1fr 1fr;border-bottom:1px solid var(--line)}
+.lab{padding:28px 28px 32px 0;border-right:1px solid var(--line);min-width:0}
+.lab:nth-child(2n){padding:28px 0 32px 28px;border-right:0}
+.lab+.lab+.lab{border-top:1px solid var(--line)}
+.lab h2{font:700 30px/1 var(--sans);letter-spacing:-.02em;margin:6px 0 8px}
+.lab>p{color:#b5bba8;font-size:14.5px;max-width:58ch;margin-bottom:16px}
+.ins{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:14px}
+.ins label{display:block}
+.ins label .k{display:block;margin-bottom:5px}
+.outs{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:1px;background:var(--line);border:1px solid var(--line);margin:14px 0}
+.outs div{background:var(--panel);padding:12px 14px}
+.outs b{display:block;font:500 20px/1.25 var(--mono);margin-top:3px;word-break:break-word}
+.lime{color:var(--lime)} .red{color:var(--red)} .amber{color:var(--amber)}
+svg.ch{width:100%;height:auto;display:block;background:var(--panel);border:1px solid var(--line)}
+.ledger{font:400 12.5px/1.8 var(--mono);background:var(--panel);border:1px solid var(--line);padding:10px 14px;margin-top:12px}
+.ledger div{display:grid;grid-template-columns:22px 1fr auto;gap:10px}
+.ledger .n{color:var(--mute)}
+.note{font-size:13px;color:var(--mute);margin-top:10px}
+input[type=range]{padding:0;border:0;accent-color:var(--lime);background:none}
+
+.contract{display:grid;grid-template-columns:1fr 1.3fr;gap:40px;padding:40px 0;border-bottom:1px solid var(--line)}
+.contract h2{font:700 34px/1 var(--sans);letter-spacing:-.02em;margin:6px 0 12px}
+.contract p{color:#c4c9b8}
+pre{font:400 12.5px/1.65 var(--mono);background:var(--panel);border:1px solid var(--line);padding:16px 18px;overflow-x:auto;color:#d6dbc9}
+pre .c{color:#79806f} pre .kw{color:var(--lime)}
+.tests{margin-top:14px;font:400 12.5px/1.9 var(--mono)}
+.tests div::before{content:'✓ ';color:var(--lime)}
+footer{padding:26px 0 50px;color:var(--mute);font-size:13.5px;display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap}
+
+@media (max-width:960px){
+  .wrap{padding:0 16px}
+  .top{grid-template-columns:1fr;gap:16px}
+  .pool{grid-template-columns:1fr 1fr}
+  .pool>div{border-bottom:1px solid var(--line)}
+  .grid{grid-template-columns:1fr}
+  .lab,.lab:nth-child(2n){padding:24px 0;border-right:0;border-top:1px solid var(--line)}
+  .contract{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <h1>AMM<br><span>Lab.</span></h1>
+    <p>Live reserves from Uniswap V2 pools on Ethereum mainnet, read with a raw <code class="mono">eth_call</code>, and the four things that happen to them: price impact, sandwich attacks, arbitrage against Binance, and impermanent loss. The pool math is the same integer math as the Solidity contract below, whose tests replay the sandwich on-chain and match this page to the wei.</p>
+  </header>
+
+  <section class="pool">
+    <div><span class="k">Pool</span><select id="poolSel" style="margin-top:6px"></select></div>
+    <div><span class="k" id="r0k">Reserve 0</span><b id="r0">-</b></div>
+    <div><span class="k" id="r1k">Reserve 1</span><b id="r1">-</b></div>
+    <div><span class="k">Spot price</span><b id="spot">-</b></div>
+    <div><span class="k">Block</span><b id="blk">-</b></div>
+  </section>
+
+  <section class="grid">
+    <!-- swap -->
+    <div class="lab">
+      <span class="k">01 · price impact</span><h2>The curve</h2>
+      <p>Every trade slides along x · y = k. Bigger trades travel further along the hyperbola, and the average price paid gets worse. The 0.3% fee stays in the pool.</p>
+      <div class="ins">
+        <label><span class="k" id="swInK">Sell</span><input id="swIn" type="number" min="0" step="any"></label>
+        <label><span class="k">Direction</span><select id="swDir"></select></label>
+      </div>
+      <input id="swSlide" type="range" min="0" max="100" value="20" aria-label="Trade size as share of reserves">
+      <div class="outs">
+        <div><span class="k">You receive</span><b id="swOut">-</b></div>
+        <div><span class="k">Avg price</span><b id="swExec">-</b></div>
+        <div><span class="k">Price impact</span><b id="swImp">-</b></div>
+        <div><span class="k">Fee to LPs</span><b id="swFee">-</b></div>
+      </div>
+      <svg class="ch" id="curve" viewBox="0 0 560 300"></svg>
+    </div>
+
+    <!-- sandwich -->
+    <div class="lab">
+      <span class="k">02 · MEV</span><h2>The sandwich</h2>
+      <p>A bot sees your swap in the mempool, buys just before you, lets you fill at the worse price, and sells straight after. The most it can take is set by your slippage tolerance. This finds the bot's profit-maximising front-run with exact integer search.</p>
+      <div class="ins">
+        <label><span class="k" id="vInK">Victim sells</span><input id="vIn" type="number" min="0" step="any"></label>
+        <label><span class="k">Slippage tolerance %</span><input id="vSlip" type="number" min="0.01" step="0.1" value="1"></label>
+        <label><span class="k">Bot gas (USD, both legs)</span><input id="vGas" type="number" min="0" step="1" value="12"></label>
+      </div>
+      <div class="outs">
+        <div><span class="k">Optimal front-run</span><b id="sbX">-</b></div>
+        <div><span class="k">Bot profit, net of gas</span><b id="sbP">-</b></div>
+        <div><span class="k">Victim loses</span><b id="sbL">-</b></div>
+      </div>
+      <svg class="ch" id="sandChart" viewBox="0 0 560 220"></svg>
+      <div class="ledger" id="ledger"></div>
+    </div>
+
+    <!-- arbitrage -->
+    <div class="lab">
+      <span class="k">03 · arbitrage</span><h2>Back to the market price</h2>
+      <p>When Binance moves, the pool is stale until someone trades it back. The profit-maximising trade has a closed form: input = (√(γ·x·y·P) − y) / γ. That profit is a cost paid by LPs, known as loss-versus-rebalancing.</p>
+      <div class="ins">
+        <label><span class="k">CEX price</span><input id="cex" type="number" step="any"></label>
+        <label><span class="k">Source</span><select id="cexSrc"><option value="live">Binance live</option><option value="manual">Manual</option></select></label>
+      </div>
+      <div class="outs">
+        <div><span class="k">Pool vs CEX</span><b id="abGap">-</b></div>
+        <div><span class="k">Arb trade</span><b id="abT">-</b></div>
+        <div><span class="k">Arb profit</span><b id="abP">-</b></div>
+        <div><span class="k">Pool price after</span><b id="abN">-</b></div>
+      </div>
+      <p class="note" id="abNote"></p>
+    </div>
+
+    <!-- IL -->
+    <div class="lab">
+      <span class="k">04 · LP economics</span><h2>Impermanent loss</h2>
+      <p>An LP's position rebalances against every price move, so it always ends up holding more of whatever fell. Versus simply holding, the LP is down 2√r / (1 + r) − 1 at price ratio r. Fees have to outrun that.</p>
+      <div class="ins">
+        <label><span class="k">Deposit (USD)</span><input id="ilDep" type="number" value="10000" min="0"></label>
+        <label><span class="k">Price change %</span><input id="ilMove" type="number" value="50" step="any"></label>
+        <label><span class="k">Fee APR %</span><input id="ilApr" type="number" value="12" step="any"></label>
+        <label><span class="k">Days held</span><input id="ilDays" type="number" value="90" min="0"></label>
+      </div>
+      <div class="outs">
+        <div><span class="k">Hold value</span><b id="ilHold">-</b></div>
+        <div><span class="k">LP value + fees</span><b id="ilLp">-</b></div>
+        <div><span class="k">IL vs hold</span><b id="ilIl">-</b></div>
+        <div><span class="k">Break-even APR</span><b id="ilBe">-</b></div>
+      </div>
+      <svg class="ch" id="ilChart" viewBox="0 0 560 220"></svg>
+    </div>
+  </section>
+
+  <section class="contract">
+    <div>
+      <span class="k">05 · on-chain</span><h2>MiniPair.sol</h2>
+      <p>A Uniswap-V2-style pool written in Solidity 0.8: LP shares minted at √(x·y) with locked minimum liquidity, a 0.30% fee that compounds into k, slippage and deadline guards, reentrancy protection and an invariant assert on every swap.</p>
+      <p style="margin-top:10px">The Hardhat suite imports this page's math library and replays the sandwich against the real contract. The attacker's on-chain profit equals the browser's prediction exactly.</p>
+      <div class="tests">
+        <div>mints √(x·y) shares on first deposit and locks the minimum</div>
+        <div>prices a swap exactly like the JavaScript model</div>
+        <div>grows k with fees, so LPs earn on round trips</div>
+        <div>reverts when slippage exceeds the caller limit</div>
+        <div>rejects unknown tokens, zero input and stale deadlines</div>
+        <div>extracts exactly the profit the model predicts (2% slippage)</div>
+        <div>a 0.1% limit cuts the extractable value by more than 10x</div>
+        <div>over-sized front-runs make the victim revert instead of overpaying</div>
+      </div>
+    </div>
+<pre><span class="kw">function</span> swapExactIn(address tokenIn, uint256 amountIn,
+    uint256 minOut, address to, uint256 deadline)
+    external nonReentrant beforeDeadline(deadline)
+    returns (uint256 amountOut)
+{
+    bool zeroForOne;
+    <span class="kw">if</span> (tokenIn == address(token0)) zeroForOne = <span class="kw">true</span>;
+    <span class="kw">else if</span> (tokenIn != address(token1)) <span class="kw">revert</span> InvalidToken();
+
+    (uint256 rIn, uint256 rOut) = zeroForOne
+        ? (reserve0, reserve1) : (reserve1, reserve0);
+    amountOut = getAmountOut(amountIn, rIn, rOut);
+    <span class="c">// the caller's slippage limit is the sandwich's ceiling</span>
+    <span class="kw">if</span> (amountOut &lt; minOut) <span class="kw">revert</span> InsufficientOutput(amountOut, minOut);
+
+    uint256 kBefore = uint256(reserve0) * reserve1;
+    IERC20(tokenIn).safeTransferFrom(msg.sender, address(this), amountIn);
+    (zeroForOne ? token1 : token0).safeTransfer(to, amountOut);
+    _sync();
+    <span class="kw">assert</span>(uint256(reserve0) * reserve1 &gt;= kBefore); <span class="c">// k never shrinks</span>
+    <span class="kw">emit</span> Swap(msg.sender, tokenIn, amountIn, amountOut, to);
+}</pre>
+  </section>
+
+  <footer>
+    <span>Built by <a href="https://sunghanpark.vercel.app">Sunghan Park</a>. Source, contracts and tests: <a href="https://github.com/hpark236/amm-lab">github.com/hpark236/amm-lab</a></span>
+    <span>Reserves via publicnode.com JSON-RPC · CEX price via Binance · educational, not trading advice</span>
+  </footer>
+</div>
+
+<script type="module">
+import { getAmountOut, sandwich, impermanentLoss, quote, arbitrage } from './lib/amm.mjs';
+
+const POOLS = [
+  { id: '0xB4e16d0168e52d35CaCD2c6185b44281Ec28C9Dc', name: 'USDC / WETH', t: [['USDC', 6], ['WETH', 18]], cex: 'ETHUSDT', base: 1 },
+  { id: '0x0d4a11d5EEaaC28EC3F61d100daF4d40471f1852', name: 'WETH / USDT', t: [['WETH', 18], ['USDT', 6]], cex: 'ETHUSDT', base: 0 },
+  { id: '0xA478c2975Ab1Ea89e8196811F51A7B7Ade33eB11', name: 'DAI / WETH', t: [['DAI', 18], ['WETH', 18]], cex: 'ETHUSDT', base: 1 },
+  { id: '0xA43fe16908251ee70EF74718545e4FE6C5cCEc9f', name: 'PEPE / WETH', t: [['PEPE', 18], ['WETH', 18]], cex: 'PEPEETH', base: 0 },
+];
+const RPC = 'https://ethereum-rpc.publicnode.com';
+const $ = s => document.querySelector(s);
+const st = { pool: POOLS[0], r: [0n, 0n], cex: null };
+
+const toF = (raw, dec) => Number(raw) / 10 ** dec;
+const toRaw = (f, dec) => BigInt(Math.floor(f * 10 ** Math.min(dec, 6))) * 10n ** BigInt(Math.max(0, dec - 6));
+const fmt = (n, d = 2) => !isFinite(n) ? '-' : Math.abs(n) >= 1e9 ? (n / 1e9).toFixed(2) + 'B' : Math.abs(n) >= 1e6 ? (n / 1e6).toFixed(2) + 'M' : Math.abs(n) >= 1e4 ? n.toLocaleString('en-US', { maximumFractionDigits: 0 }) : Math.abs(n) >= 1 ? n.toLocaleString('en-US', { maximumFractionDigits: d }) : n.toPrecision(4);
+const usd = n => (n < 0 ? '−$' : '$') + fmt(Math.abs(n));
+
+// side A = the quote asset (what the user spends: USDC, USDT, DAI, WETH for PEPE), side B = the base
+const sides = () => { const p = st.pool, b = p.base, a = 1 - b; return { a, b, A: p.t[a], B: p.t[b], rA: st.r[a], rB: st.r[b] }; };
+const priceBinA = () => { const s = sides(); return toF(s.rA, s.A[1]) / toF(s.rB, s.B[1]); }; // A per B
+
+async function rpc(method, params) {
+  const r = await fetch(RPC, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }) });
+  const j = await r.json(); if (j.error) throw new Error(j.error.message); return j.result;
+}
+async function loadPool() {
+  // getReserves() selector 0x0902f1ac -> (uint112 reserve0, uint112 reserve1, uint32 blockTimestampLast), ABI-decoded by hand
+  const [res, blk] = await Promise.all([rpc('eth_call', [{ to: st.pool.id, data: '0x0902f1ac' }, 'latest']), rpc('eth_blockNumber', [])]);
+  const w = res.slice(2).match(/.{64}/g);
+  st.r = [BigInt('0x' + w[0]), BigInt('0x' + w[1])];
+  const p = st.pool;
+  $('#r0k').textContent = `Reserve · ${p.t[0][0]}`; $('#r1k').textContent = `Reserve · ${p.t[1][0]}`;
+  $('#r0').textContent = fmt(toF(st.r[0], p.t[0][1])); $('#r1').textContent = fmt(toF(st.r[1], p.t[1][1]));
+  const s = sides();
+  const sp = priceBinA(); $('#spot').textContent = `${sp >= 1 ? sp.toLocaleString('en-US', { maximumFractionDigits: 2 }) : sp.toPrecision(4)} ${s.A[0]}/${s.B[0]}`;
+  $('#blk').textContent = parseInt(blk, 16).toLocaleString('en-US');
+}
+async function loadCex() {
+  try {
+    const px = sym => fetch(`https://api.binance.com/api/v3/ticker/price?symbol=${sym}`).then(r => r.json()).then(j => Number(j.price));
+    // Binance has no PEPE/ETH book, so cross it through USDT
+    st.cex = st.pool.cex === 'PEPEETH' ? (await px('PEPEUSDT')) / (await px('ETHUSDT')) : await px(st.pool.cex);
+    if (!(st.cex > 0)) st.cex = null;
+  } catch { st.cex = null; }
+  if ($('#cexSrc').value === 'live') $('#cex').value = st.cex ? +st.cex.toPrecision(8) : +priceBinA().toPrecision(8);
+}
+
+// ---------- 01 swap ----------
+function setupInputs() {
+  const s = sides();
+  $('#swDir').innerHTML = `<option value="AB">${s.A[0]} → ${s.B[0]}</option><option value="BA">${s.B[0]} → ${s.A[0]}</option>`;
+  $('#vInK').textContent = `Victim sells (${s.A[0]})`;
+  const aDepth = toF(s.rA, s.A[1]);
+  $('#vIn').value = +(aDepth * 0.02).toPrecision(2);
+  $('#swSlide').value = 20; slideToAmount();
+}
+function slideToAmount() {
+  const s = sides(), dir = $('#swDir').value;
+  const depth = dir === 'AB' ? toF(s.rA, s.A[1]) : toF(s.rB, s.B[1]);
+  const v = depth * (Number($('#swSlide').value) / 100) ** 2 * 0.5; // quadratic slider, up to 50% of the reserve
+  $('#swIn').value = +v.toPrecision(3);
+  swap();
+}
+function swap() {
+  const s = sides(), dir = $('#swDir').value;
+  const [IN, OUT, rIn, rOut] = dir === 'AB' ? [s.A, s.B, s.rA, s.rB] : [s.B, s.A, s.rB, s.rA];
+  $('#swInK').textContent = `Sell (${IN[0]})`;
+  const x = toF(rIn, IN[1]), y = toF(rOut, OUT[1]), a = Math.max(0, Number($('#swIn').value) || 0);
+  const q = quote(a, x, y);
+  const outExact = toF(getAmountOut(toRaw(a, IN[1]), rIn, rOut), OUT[1]);
+  $('#swOut').textContent = `${fmt(outExact, 6)} ${OUT[0]}`;
+  $('#swExec').textContent = a ? `${fmt(a / outExact, 6)} ${IN[0]}` : '-';
+  $('#swImp').innerHTML = a ? `<span class="${q.impact > 0.02 ? 'red' : ''}">${(q.impact * 100).toFixed(3)}%</span>` : '-';
+  $('#swFee').textContent = `${fmt(a * 0.003, 6)} ${IN[0]}`;
+  drawCurve(x, y, a, outExact, IN[0], OUT[0]);
+}
+function drawCurve(x, y, a, out, inN, outN) {
+  const W = 560, H = 300, L = 54, B = 34, k = x * y;
+  const span = Math.max(a * 2.2, x * 0.08), xmin = Math.max(x * 0.05, x - span * 0.6), xmax = x + a + span;
+  const ymax = (k / xmin) * 1.04, ymin0 = k / xmax * 0.9, sx = v => L + (v - xmin) / (xmax - xmin) * (W - L - 16), sy = v => H - B - (v - ymin0) / (ymax - ymin0) * (H - B - 14);
+  let path = '';
+  for (let i = 0; i <= 120; i++) { const xv = xmin + (xmax - xmin) * i / 120; path += (i ? 'L' : 'M') + sx(xv).toFixed(1) + ',' + sy(k / xv).toFixed(1); }
+  const p0 = [sx(x), sy(y)], p1 = [sx(x + a), sy(y - out)];
+  $('#curve').innerHTML = `
+    <line x1="${L}" y1="${H - B}" x2="${W - 10}" y2="${H - B}" stroke="#2a2f26"/><line x1="${L}" y1="10" x2="${L}" y2="${H - B}" stroke="#2a2f26"/>
+    <path d="${path}" fill="none" stroke="#8d9483" stroke-width="1.5"/>
+    <line x1="${p0[0]}" y1="${p0[1]}" x2="${p1[0]}" y2="${p1[1]}" stroke="#c6f05a" stroke-width="1" stroke-dasharray="4 4"/>
+    <circle cx="${p0[0]}" cy="${p0[1]}" r="5" fill="#e9ecdf"/><circle cx="${p1[0]}" cy="${p1[1]}" r="6" fill="#c6f05a"/>
+    <text x="${p0[0] + 9}" y="${p0[1] - 8}" fill="#e9ecdf" font-family="Fragment Mono" font-size="11">before</text>
+    <text x="${p1[0] + 9}" y="${p1[1] + 20}" fill="#c6f05a" font-family="Fragment Mono" font-size="11">after</text>
+    <text x="${W - 14}" y="${H - 10}" fill="#8d9483" font-family="Fragment Mono" font-size="10.5" text-anchor="end">${inN} in pool →</text>
+    <text x="16" y="20" fill="#8d9483" font-family="Fragment Mono" font-size="10.5">${outN}</text>
+    <text x="${W - 14}" y="24" fill="#8d9483" font-family="Fragment Mono" font-size="10.5" text-anchor="end">x · y = k</text>`;
+}
+
+// ---------- 02 sandwich ----------
+function sand() {
+  const s = sides();
+  const vIn = toRaw(Math.max(0, Number($('#vIn').value) || 0), s.A[1]);
+  const slip = Math.max(0.01, Number($('#vSlip').value) || 0.01);
+  if (vIn <= 0n) return;
+  const fair = getAmountOut(vIn, s.rA, s.rB);
+  const minOut = fair * BigInt(Math.round((100 - slip) * 1e4)) / 1_000_000n;
+  const r = sandwich({ rA: s.rA, rB: s.rB, victimIn: vIn, victimMinOut: minOut, samples: 80 });
+  const A = s.A[0], dA = s.A[1], B = s.B[0], dB = s.B[1];
+  const toUsd = raw => toF(raw, dA) * (A === 'WETH' ? (st.ethUsd || 2500) : 1);
+  const gas = Number($('#vGas').value) || 0;
+  const net = toUsd(r.best.profit) - gas;
+  $('#sbX').textContent = `${fmt(toF(r.best.x, dA))} ${A}`;
+  $('#sbP').innerHTML = `<span class="${net > 0 ? 'lime' : 'red'}">${usd(net)}</span>`;
+  $('#sbL').innerHTML = `<span class="red">${fmt(toF(r.victimLoss, dB), 6)} ${B}</span>`;
+  const pts = r.curve.map(([x, p]) => [toF(x, dA), toUsd(p) - gas]);
+  const W = 560, H = 220, L = 50, Bt = 30;
+  const xm = Math.max(...pts.map(p => p[0])) || 1, ymn = Math.min(0, ...pts.map(p => p[1])), ymx = Math.max(1, ...pts.map(p => p[1]));
+  const sx = v => L + v / xm * (W - L - 16), sy = v => H - Bt - (v - ymn) / (ymx - ymn) * (H - Bt - 16);
+  const bx = sx(toF(r.best.x, dA)), by = sy(net);
+  $('#sandChart').innerHTML = `
+    <line x1="${L}" y1="${sy(0)}" x2="${W - 10}" y2="${sy(0)}" stroke="#2a2f26"/>
+    <polyline points="${pts.map(p => sx(p[0]).toFixed(1) + ',' + sy(p[1]).toFixed(1)).join(' ')}" fill="none" stroke="#c6f05a" stroke-width="2"/>
+    <line x1="${sx(xm)}" y1="12" x2="${sx(xm)}" y2="${H - Bt}" stroke="#ff7a66" stroke-dasharray="3 4"/>
+    <text x="${sx(xm) - 6}" y="24" fill="#ff7a66" font-family="Fragment Mono" font-size="10.5" text-anchor="end">victim's limit</text>
+    <circle cx="${bx}" cy="${by}" r="5" fill="#e9ecdf"/>
+    <text x="${L}" y="${H - 8}" fill="#8d9483" font-family="Fragment Mono" font-size="10.5">front-run size (${A}) →</text>
+    <text x="${L - 6}" y="${sy(0) + 4}" fill="#8d9483" font-family="Fragment Mono" font-size="10" text-anchor="end">$0</text>
+    <text x="${L + 6}" y="${sy(ymx) + 4}" fill="#8d9483" font-family="Fragment Mono" font-size="10">${usd(ymx)}</text>`;
+  $('#ledger').innerHTML = `
+    <div><span class="n">1</span><span>Bot buys ${fmt(toF(r.best.got, dB), 6)} ${B} for ${fmt(toF(r.best.x, dA))} ${A}</span><span class="amber">front-run</span></div>
+    <div><span class="n">2</span><span>Victim gets ${fmt(toF(r.best.vOut, dB), 6)} ${B} instead of ${fmt(toF(fair, dB), 6)}</span><span class="red">−${((1 - Number(r.best.vOut) / Number(fair)) * 100).toFixed(2)}%</span></div>
+    <div><span class="n">3</span><span>Bot sells back for ${fmt(toF(r.best.back, dA))} ${A}</span><span class="lime">back-run</span></div>`;
+}
+
+// ---------- 03 arbitrage ----------
+function arb() {
+  const s = sides();
+  const x = toF(s.rB, s.B[1]), y = toF(s.rA, s.A[1]); // treat B as token "0" priced in A
+  const P = Number($('#cex').value);
+  if (!(P > 0)) return;
+  const spot = y / x, gap = (spot / P - 1) * 100;
+  $('#abGap').innerHTML = `<span class="${Math.abs(gap) > 0.3 ? 'amber' : ''}">${gap >= 0 ? '+' : ''}${gap.toFixed(3)}%</span>`;
+  const a = arbitrage(x, y, P);
+  const A = s.A[0], B = s.B[0];
+  const toUsd = v => A === 'WETH' ? v * (st.ethUsd || 2500) : v;
+  if (!a) {
+    $('#abT').textContent = 'none'; $('#abP').textContent = '$0'; $('#abN').textContent = fmt(spot, 6);
+    $('#abNote').textContent = `The pool is within the 0.3% fee band of the CEX price, so no trade is profitable before gas.`;
+    return;
+  }
+  $('#abT').textContent = a.side === 'buy0' ? `Pay ${fmt(a.in)} ${A}, get ${fmt(a.out, 6)} ${B}` : `Sell ${fmt(a.in, 6)} ${B} for ${fmt(a.out)} ${A}`;
+  $('#abP').innerHTML = `<span class="lime">${usd(toUsd(a.profit))}</span>`;
+  $('#abN').textContent = fmt(a.newPrice, 6);
+  $('#abNote').textContent = `Profit is before gas and CEX hedging costs. In practice searchers race for this in the first transaction of each block, and the LPs who supplied the stale price pay for it.`;
+}
+
+// ---------- 04 IL ----------
+function il() {
+  const dep = Number($('#ilDep').value) || 0, mv = Number($('#ilMove').value) || 0, apr = Number($('#ilApr').value) || 0, days = Number($('#ilDays').value) || 0;
+  const r = Math.max(0.0001, 1 + mv / 100);
+  const hold = dep / 2 * r + dep / 2, lpNoFee = dep * Math.sqrt(r), fees = dep * apr / 100 * days / 365;
+  const loss = impermanentLoss(r);
+  $('#ilHold').textContent = usd(hold);
+  $('#ilLp').innerHTML = `<span class="${lpNoFee + fees >= hold ? 'lime' : 'red'}">${usd(lpNoFee + fees)}</span>`;
+  $('#ilIl').innerHTML = `<span class="red">${(loss * 100).toFixed(2)}%</span>`;
+  $('#ilBe').textContent = days ? ((hold - lpNoFee) / dep * 365 / days * 100).toFixed(1) + '%' : '-';
+  const W = 560, H = 220, L = 50, B = 30, xs = [];
+  for (let i = 0; i <= 160; i++) xs.push(-90 + i * (400 / 160));
+  const ys = xs.map(m => impermanentLoss(1 + m / 100) * 100), ymin = Math.min(...ys);
+  const sx = m => L + (m + 90) / 400 * (W - L - 16), sy = v => 14 + (v / ymin) * (H - B - 20);
+  $('#ilChart').innerHTML = `
+    <line x1="${L}" y1="${sy(0)}" x2="${W - 10}" y2="${sy(0)}" stroke="#2a2f26"/><line x1="${sx(0)}" y1="10" x2="${sx(0)}" y2="${H - B}" stroke="#2a2f26"/>
+    <polyline points="${xs.map((m, i) => sx(m).toFixed(1) + ',' + sy(ys[i]).toFixed(1)).join(' ')}" fill="none" stroke="#ff7a66" stroke-width="2"/>
+    <circle cx="${sx(Math.max(-90, Math.min(310, mv)))}" cy="${sy(loss * 100)}" r="5" fill="#c6f05a"/>
+    <text x="${W - 14}" y="${H - 8}" fill="#8d9483" font-family="Fragment Mono" font-size="10.5" text-anchor="end">price change → (−90% to +310%)</text>
+    <text x="${L - 6}" y="${sy(ymin) + 4}" fill="#8d9483" font-family="Fragment Mono" font-size="10" text-anchor="end">${ymin.toFixed(0)}%</text>
+    <text x="${L - 6}" y="${sy(0) + 4}" fill="#8d9483" font-family="Fragment Mono" font-size="10" text-anchor="end">0%</text>`;
+}
+
+async function refresh() {
+  try { await loadPool(); } catch (e) { $('#blk').textContent = 'RPC error'; return; }
+  await loadCex();
+  swap(); sand(); arb();
+}
+$('#poolSel').innerHTML = POOLS.map((p, i) => `<option value="${i}">${p.name} · Uniswap V2</option>`).join('');
+$('#poolSel').onchange = async () => { st.pool = POOLS[+$('#poolSel').value]; await loadPool(); await loadCex(); setupInputs(); sand(); arb(); };
+$('#swSlide').oninput = slideToAmount; $('#swIn').oninput = swap; $('#swDir').onchange = slideToAmount;
+['#vIn', '#vSlip', '#vGas'].forEach(s => $(s).oninput = sand);
+$('#cex').oninput = () => { $('#cexSrc').value = 'manual'; arb(); };
+$('#cexSrc').onchange = async () => { await loadCex(); arb(); };
+['#ilDep', '#ilMove', '#ilApr', '#ilDays'].forEach(s => $(s).oninput = il);
+
+(async () => {
+  try { st.ethUsd = Number((await fetch('https://api.binance.com/api/v3/ticker/price?symbol=ETHUSDT').then(r => r.json())).price) || 2500; } catch { st.ethUsd = 2500; }
+  await loadPool(); await loadCex(); setupInputs(); sand(); arb(); il();
+  setInterval(refresh, 15000);
+})();
+</script>
+</body>
+</html>

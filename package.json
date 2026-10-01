@@ -1,0 +1,16 @@
+{
+  "name": "amm-lab",
+  "version": "1.0.0",
+  "private": true,
+  "description": "A Uniswap-v2-style constant-product pool in Solidity, plus a browser lab for swaps, sandwich attacks, arbitrage and impermanent loss on live mainnet reserves",
+  "scripts": {
+    "test": "hardhat test && node --test lib/*.test.mjs",
+    "test:sol": "hardhat test",
+    "test:js": "node --test lib/*.test.mjs"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^5.0.0",
+    "@openzeppelin/contracts": "^5.6.1",
+    "hardhat": "^2.29.1"
+  }
+}
