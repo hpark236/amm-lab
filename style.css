@@ -1,0 +1,39 @@
+/* Plain shared stylesheet for the project pages. */
+*{box-sizing:border-box}
+body{margin:0 auto;max-width:1040px;padding:32px 20px 60px;font:15px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;color:#111;background:#fff}
+h1{font-size:26px;margin:0 0 6px}
+h2{font-size:19px;margin:36px 0 10px}
+h3{font-size:16px;margin:24px 0 8px}
+p{margin:0 0 12px}
+.desc{color:#444;max-width:720px;margin-bottom:20px}
+a{color:#0645ad}
+.muted{color:#777}
+.small{font-size:13px}
+.pos{color:#137333}
+.neg{color:#b3261e}
+code,.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:13px}
+table{border-collapse:collapse;width:100%;font-size:14px;margin:6px 0 14px}
+th,td{padding:6px 8px;border-bottom:1px solid #e3e3e3;text-align:right;vertical-align:top}
+th{font-weight:600;color:#555;background:#fafafa}
+th.l,td.l{text-align:left}
+tbody tr[data-k],tbody tr.click{cursor:pointer}
+tbody tr[data-k]:hover td,tbody tr.click:hover td{background:#f5f8ff}
+button,input,select,textarea{font:inherit;padding:5px 10px;border:1px solid #c7c7c7;border-radius:4px;background:#fff;color:#111}
+button{cursor:pointer}
+button:hover{background:#f2f2f2}
+button.on{background:#111;color:#fff;border-color:#111}
+.controls{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.box{border:1px solid #e3e3e3;border-radius:4px;padding:14px 16px;margin:10px 0}
+.kv{display:grid;grid-template-columns:180px 1fr;gap:4px 14px;font-size:14px}
+.kv dt{color:#666}
+.kv dd{margin:0;word-break:break-all}
+ul{padding-left:20px}
+li{margin:4px 0}
+img{max-width:100%}
+@media (max-width:700px){
+  body{padding:20px 12px 40px}
+  table{font-size:12.5px}
+  th,td{padding:5px 4px}
+  .kv{grid-template-columns:1fr}
+  .kv dt{margin-top:6px}
+}

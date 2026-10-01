@@ -3,211 +3,117 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>AMM Lab · swaps, sandwiches, arbitrage, impermanent loss</title>
-<meta name="description" content="Live Uniswap V2 reserves from Ethereum mainnet, and the math of what happens to them: price impact, optimal sandwich attacks, CEX arbitrage and impermanent loss. Backed by a Solidity pool whose tests replay the same attack on-chain.">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22%3E%3Crect width=%2232%22 height=%2232%22 fill=%22%230e100d%22/%3E%3Cpath d=%22M6 4c0 16 6 22 22 22%22 fill=%22none%22 stroke=%22%23c6f05a%22 stroke-width=%223%22/%3E%3C/svg%3E">
-<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@400;500;600;700&family=Fragment+Mono&display=swap" rel="stylesheet">
+<title>AMM Lab</title>
+<meta name="description" content="A Uniswap V2 style pool in Solidity, and a calculator for price impact, sandwich attacks, arbitrage and impermanent loss using live Uniswap V2 reserves.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="/style.css">
 <style>
-:root{
-  --bg:#0e100d; --panel:#151813; --line:#2a2f26; --ink:#e9ecdf; --mute:#8d9483; --lime:#c6f05a; --lime2:#9cc23c; --red:#ff7a66; --amber:#f2c14e;
-  --sans:'Familjen Grotesk',sans-serif; --mono:'Fragment Mono',monospace;
-}
-*{box-sizing:border-box;margin:0;padding:0}
-html{background:var(--bg)}
-body{background:var(--bg);color:var(--ink);font:400 15px/1.6 var(--sans);-webkit-font-smoothing:antialiased}
-a{color:var(--lime)}
-.wrap{max-width:1240px;margin:0 auto;padding:0 28px}
-.mono{font-family:var(--mono)}
-.k{font:400 11px/1.4 var(--mono);text-transform:uppercase;letter-spacing:.08em;color:var(--mute)}
-
-.top{display:grid;grid-template-columns:auto 1fr;gap:40px;align-items:end;padding:38px 0 26px;border-bottom:1px solid var(--line)}
-.top h1{font:700 clamp(54px,8vw,112px)/.86 var(--sans);letter-spacing:-.035em}
-.top h1 span{color:var(--lime)}
-.top p{max-width:60ch;color:#c4c9b8;font-size:16px}
-
-/* pool strip */
-.pool{display:grid;grid-template-columns:260px repeat(4,1fr);border-bottom:1px solid var(--line)}
-.pool>div{padding:16px 18px;border-right:1px solid var(--line)}
-.pool>div:last-child{border-right:0}
-.pool b{display:block;font:500 22px/1.2 var(--mono);margin-top:4px;word-break:break-all}
-select,input{font:400 14px var(--mono);background:var(--bg);color:var(--ink);border:1px solid var(--line);padding:9px 10px;width:100%}
-select:focus,input:focus{outline:1px solid var(--lime);border-color:var(--lime)}
-
-.grid{display:grid;grid-template-columns:1fr 1fr;border-bottom:1px solid var(--line)}
-.lab{padding:28px 28px 32px 0;border-right:1px solid var(--line);min-width:0}
-.lab:nth-child(2n){padding:28px 0 32px 28px;border-right:0}
-.lab+.lab+.lab{border-top:1px solid var(--line)}
-.lab h2{font:700 30px/1 var(--sans);letter-spacing:-.02em;margin:6px 0 8px}
-.lab>p{color:#b5bba8;font-size:14.5px;max-width:58ch;margin-bottom:16px}
-.ins{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:14px}
-.ins label{display:block}
-.ins label .k{display:block;margin-bottom:5px}
-.outs{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:1px;background:var(--line);border:1px solid var(--line);margin:14px 0}
-.outs div{background:var(--panel);padding:12px 14px}
-.outs b{display:block;font:500 20px/1.25 var(--mono);margin-top:3px;word-break:break-word}
-.lime{color:var(--lime)} .red{color:var(--red)} .amber{color:var(--amber)}
-svg.ch{width:100%;height:auto;display:block;background:var(--panel);border:1px solid var(--line)}
-.ledger{font:400 12.5px/1.8 var(--mono);background:var(--panel);border:1px solid var(--line);padding:10px 14px;margin-top:12px}
-.ledger div{display:grid;grid-template-columns:22px 1fr auto;gap:10px}
-.ledger .n{color:var(--mute)}
-.note{font-size:13px;color:var(--mute);margin-top:10px}
-input[type=range]{padding:0;border:0;accent-color:var(--lime);background:none}
-
-.contract{display:grid;grid-template-columns:1fr 1.3fr;gap:40px;padding:40px 0;border-bottom:1px solid var(--line)}
-.contract h2{font:700 34px/1 var(--sans);letter-spacing:-.02em;margin:6px 0 12px}
-.contract p{color:#c4c9b8}
-pre{font:400 12.5px/1.65 var(--mono);background:var(--panel);border:1px solid var(--line);padding:16px 18px;overflow-x:auto;color:#d6dbc9}
-pre .c{color:#79806f} pre .kw{color:var(--lime)}
-.tests{margin-top:14px;font:400 12.5px/1.9 var(--mono)}
-.tests div::before{content:'✓ ';color:var(--lime)}
-footer{padding:26px 0 50px;color:var(--mute);font-size:13.5px;display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap}
-
-@media (max-width:960px){
-  .wrap{padding:0 16px}
-  .top{grid-template-columns:1fr;gap:16px}
-  .pool{grid-template-columns:1fr 1fr}
-  .pool>div{border-bottom:1px solid var(--line)}
-  .grid{grid-template-columns:1fr}
-  .lab,.lab:nth-child(2n){padding:24px 0;border-right:0;border-top:1px solid var(--line)}
-  .contract{grid-template-columns:1fr}
-}
+.lime{color:#137333}.red{color:#b3261e}.amber{color:#b06000}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px 16px;margin:8px 0 12px}
+.grid2 label{display:block;font-size:13px;color:#555}
+.grid2 input,.grid2 select{width:100%;margin-top:3px}
+svg.ch{width:100%;max-width:640px;height:auto;display:block;border:1px solid #e3e3e3;margin:8px 0}
+.ledger div{display:grid;grid-template-columns:24px 1fr auto;gap:8px;font-size:14px;padding:3px 0}
+.ledger .n{color:#777}
+pre{font:12.5px/1.6 ui-monospace,Menlo,monospace;background:#f7f7f7;border:1px solid #e3e3e3;padding:12px 14px;overflow-x:auto}
+input[type=range]{width:100%;max-width:640px;padding:0;border:0}
 </style>
 </head>
 <body>
-<div class="wrap">
-  <header class="top">
-    <h1>AMM<br><span>Lab.</span></h1>
-    <p>Live reserves from Uniswap V2 pools on Ethereum mainnet, read with a raw <code class="mono">eth_call</code>, and the four things that happen to them: price impact, sandwich attacks, arbitrage against Binance, and impermanent loss. The pool math is the same integer math as the Solidity contract below, whose tests replay the sandwich on-chain and match this page to the wei.</p>
-  </header>
+<h1>AMM Lab</h1>
+<p class="desc">A Uniswap V2 style liquidity pool written in Solidity, and a calculator that uses live reserves from Uniswap V2 on Ethereum mainnet to show price impact, sandwich attacks, arbitrage against Binance, and impermanent loss.</p>
 
-  <section class="pool">
-    <div><span class="k">Pool</span><select id="poolSel" style="margin-top:6px"></select></div>
-    <div><span class="k" id="r0k">Reserve 0</span><b id="r0">-</b></div>
-    <div><span class="k" id="r1k">Reserve 1</span><b id="r1">-</b></div>
-    <div><span class="k" id="spotk">Spot price</span><b id="spot">-</b></div>
-    <div><span class="k">Block</span><b id="blk">-</b></div>
-  </section>
+<div class="grid2">
+  <label>Pool<select id="poolSel"></select></label>
+  <label><span id="r0k">Reserve 0</span><br><b id="r0" class="mono">-</b></label>
+  <label><span id="r1k">Reserve 1</span><br><b id="r1" class="mono">-</b></label>
+  <label><span id="spotk">Price</span><br><b id="spot" class="mono">-</b></label>
+  <label>Block<br><b id="blk" class="mono">-</b></label>
+</div>
 
-  <section class="grid">
-    <!-- swap -->
-    <div class="lab">
-      <span class="k">01 · price impact</span><h2>The curve</h2>
-      <p>Every trade slides along x · y = k. Bigger trades travel further along the hyperbola, and the average price paid gets worse. The 0.3% fee stays in the pool.</p>
-      <div class="ins">
-        <label><span class="k" id="swInK">Sell</span><input id="swIn" type="number" min="0" step="any"></label>
-        <label><span class="k">Direction</span><select id="swDir"></select></label>
-      </div>
-      <input id="swSlide" type="range" min="0" max="100" value="20" aria-label="Trade size as share of reserves">
-      <div class="outs">
-        <div><span class="k">You receive</span><b id="swOut">-</b></div>
-        <div><span class="k">Avg price</span><b id="swExec">-</b></div>
-        <div><span class="k">Price impact</span><b id="swImp">-</b></div>
-        <div><span class="k">Fee to LPs</span><b id="swFee">-</b></div>
-      </div>
-      <svg class="ch" id="curve" viewBox="0 0 560 300"></svg>
-    </div>
+<h2>1. Price impact</h2>
+<p>Swaps move along the curve x × y = k, so larger trades get a worse average price. The 0.3% fee stays in the pool.</p>
+<div class="grid2">
+  <label><span id="swInK">Sell</span><input id="swIn" type="number" min="0" step="any"></label>
+  <label>Direction<select id="swDir"></select></label>
+</div>
+<input id="swSlide" type="range" min="0" max="100" value="20" aria-label="Trade size">
+<table style="max-width:640px"><tbody>
+  <tr><td class="l">Received</td><td id="swOut">-</td></tr>
+  <tr><td class="l">Average price</td><td id="swExec">-</td></tr>
+  <tr><td class="l">Price impact</td><td id="swImp">-</td></tr>
+  <tr><td class="l">Fee paid to liquidity providers</td><td id="swFee">-</td></tr>
+</tbody></table>
+<svg class="ch" id="curve" viewBox="0 0 560 300"></svg>
 
-    <!-- sandwich -->
-    <div class="lab">
-      <span class="k">02 · MEV</span><h2>The sandwich</h2>
-      <p>A bot sees your swap in the mempool, buys just before you, lets you fill at the worse price, and sells straight after. The most it can take is set by your slippage tolerance. This finds the bot's profit-maximising front-run with exact integer search.</p>
-      <div class="ins">
-        <label><span class="k" id="vInK">Victim sells</span><input id="vIn" type="number" min="0" step="any"></label>
-        <label><span class="k">Slippage tolerance %</span><input id="vSlip" type="number" min="0.01" step="0.1" value="1"></label>
-        <label><span class="k">Bot gas (USD, both legs)</span><input id="vGas" type="number" min="0" step="1" value="12"></label>
-      </div>
-      <div class="outs">
-        <div><span class="k">Optimal front-run</span><b id="sbX">-</b></div>
-        <div><span class="k">Bot profit, net of gas</span><b id="sbP">-</b></div>
-        <div><span class="k">Victim loses</span><b id="sbL">-</b></div>
-      </div>
-      <svg class="ch" id="sandChart" viewBox="0 0 560 220"></svg>
-      <div class="ledger" id="ledger"></div>
-    </div>
+<h2>2. Sandwich attack</h2>
+<p>A bot buys just before a victim's swap and sells just after it. The victim's slippage tolerance limits how far the bot can move the price. The calculator finds the front-run size that maximises the bot's profit.</p>
+<div class="grid2">
+  <label><span id="vInK">Victim sells</span><input id="vIn" type="number" min="0" step="any"></label>
+  <label>Slippage tolerance (%)<input id="vSlip" type="number" min="0.01" step="0.1" value="1"></label>
+  <label>Bot gas cost (USD)<input id="vGas" type="number" min="0" step="1" value="12"></label>
+</div>
+<table style="max-width:640px"><tbody>
+  <tr><td class="l">Best front-run size</td><td id="sbX">-</td></tr>
+  <tr><td class="l">Bot profit after gas</td><td id="sbP">-</td></tr>
+  <tr><td class="l">Victim receives less by</td><td id="sbL">-</td></tr>
+</tbody></table>
+<div class="ledger" id="ledger"></div>
+<svg class="ch" id="sandChart" viewBox="0 0 560 220"></svg>
+<p class="small muted">Chart: bot profit against front-run size. The dashed line is the largest front-run the victim's slippage limit allows.</p>
 
-    <!-- arbitrage -->
-    <div class="lab">
-      <span class="k">03 · arbitrage</span><h2>Back to the market price</h2>
-      <p>When Binance moves, the pool is stale until someone trades it back. The profit-maximising trade has a closed form: input = (√(γ·x·y·P) − y) / γ. That profit is a cost paid by LPs, known as loss-versus-rebalancing.</p>
-      <div class="ins">
-        <label><span class="k">CEX price</span><input id="cex" type="number" step="any"></label>
-        <label><span class="k">Source</span><select id="cexSrc"><option value="live">Binance live</option><option value="manual">Manual</option></select></label>
-      </div>
-      <div class="outs">
-        <div><span class="k">Pool vs CEX</span><b id="abGap">-</b></div>
-        <div><span class="k">Arb trade</span><b id="abT">-</b></div>
-        <div><span class="k">Arb profit</span><b id="abP">-</b></div>
-        <div><span class="k">Pool price after</span><b id="abN">-</b></div>
-      </div>
-      <p class="note" id="abNote"></p>
-    </div>
+<h2>3. Arbitrage against Binance</h2>
+<p>When the pool price differs from Binance by more than the 0.3% fee, there is a trade that moves the pool back to the market price. Optimal input: (√(γ·x·y·P) − y) / γ, where γ = 0.997.</p>
+<div class="grid2">
+  <label>Binance price<input id="cex" type="number" step="any"></label>
+  <label>Source<select id="cexSrc"><option value="live">Binance (live)</option><option value="manual">Manual</option></select></label>
+</div>
+<table style="max-width:640px"><tbody>
+  <tr><td class="l">Pool vs Binance</td><td id="abGap">-</td></tr>
+  <tr><td class="l">Trade</td><td id="abT">-</td></tr>
+  <tr><td class="l">Profit before gas</td><td id="abP">-</td></tr>
+  <tr><td class="l">Pool price after</td><td id="abN">-</td></tr>
+</tbody></table>
+<p class="small muted" id="abNote"></p>
 
-    <!-- IL -->
-    <div class="lab">
-      <span class="k">04 · LP economics</span><h2>Impermanent loss</h2>
-      <p>An LP's position rebalances against every price move, so it always ends up holding more of whatever fell. Versus simply holding, the LP is down 2√r / (1 + r) − 1 at price ratio r. Fees have to outrun that.</p>
-      <div class="ins">
-        <label><span class="k">Deposit (USD)</span><input id="ilDep" type="number" value="10000" min="0"></label>
-        <label><span class="k">Price change %</span><input id="ilMove" type="number" value="50" step="any"></label>
-        <label><span class="k">Fee APR %</span><input id="ilApr" type="number" value="12" step="any"></label>
-        <label><span class="k">Days held</span><input id="ilDays" type="number" value="90" min="0"></label>
-      </div>
-      <div class="outs">
-        <div><span class="k">Hold value</span><b id="ilHold">-</b></div>
-        <div><span class="k">LP value + fees</span><b id="ilLp">-</b></div>
-        <div><span class="k">IL vs hold</span><b id="ilIl">-</b></div>
-        <div><span class="k">Break-even APR</span><b id="ilBe">-</b></div>
-      </div>
-      <svg class="ch" id="ilChart" viewBox="0 0 560 220"></svg>
-    </div>
-  </section>
+<h2>4. Impermanent loss</h2>
+<p>Compared with holding the two tokens, a liquidity provider's position is worth 2√r / (1 + r) − 1 less, where r is the price ratio. Trading fees offset this.</p>
+<div class="grid2">
+  <label>Deposit (USD)<input id="ilDep" type="number" value="10000" min="0"></label>
+  <label>Price change (%)<input id="ilMove" type="number" value="50" step="any"></label>
+  <label>Fee APR (%)<input id="ilApr" type="number" value="12" step="any"></label>
+  <label>Days<input id="ilDays" type="number" value="90" min="0"></label>
+</div>
+<table style="max-width:640px"><tbody>
+  <tr><td class="l">Value if held</td><td id="ilHold">-</td></tr>
+  <tr><td class="l">Value as liquidity provider, with fees</td><td id="ilLp">-</td></tr>
+  <tr><td class="l">Impermanent loss</td><td id="ilIl">-</td></tr>
+  <tr><td class="l">Fee APR needed to break even</td><td id="ilBe">-</td></tr>
+</tbody></table>
+<svg class="ch" id="ilChart" viewBox="0 0 560 220"></svg>
 
-  <section class="contract">
-    <div>
-      <span class="k">05 · on-chain</span><h2>MiniPair.sol</h2>
-      <p>A Uniswap-V2-style pool written in Solidity 0.8: LP shares minted at √(x·y) with locked minimum liquidity, a 0.30% fee that compounds into k, slippage and deadline guards, reentrancy protection and an invariant assert on every swap.</p>
-      <p style="margin-top:10px">The Hardhat suite imports this page's math library and replays the sandwich against the real contract. The attacker's on-chain profit equals the browser's prediction exactly.</p>
-      <div class="tests">
-        <div>mints √(x·y) shares on first deposit and locks the minimum</div>
-        <div>prices a swap exactly like the JavaScript model</div>
-        <div>grows k with fees, so LPs earn on round trips</div>
-        <div>reverts when slippage exceeds the caller limit</div>
-        <div>rejects unknown tokens, zero input and stale deadlines</div>
-        <div>extracts exactly the profit the model predicts (2% slippage)</div>
-        <div>a 0.1% limit cuts the extractable value by more than 10x</div>
-        <div>over-sized front-runs make the victim revert instead of overpaying</div>
-      </div>
-    </div>
-<pre><span class="kw">function</span> swapExactIn(address tokenIn, uint256 amountIn,
-    uint256 minOut, address to, uint256 deadline)
-    external nonReentrant beforeDeadline(deadline)
-    returns (uint256 amountOut)
+<h2>5. The contract</h2>
+<p><code>contracts/MiniPair.sol</code> is a constant-product pool for two ERC-20 tokens with LP shares, a 0.3% fee, slippage and deadline checks, and reentrancy protection. The Hardhat tests use the same math library as this page: they plan a sandwich attack off-chain, run it against the contract, and check that the profit matches exactly.</p>
+<pre>function swapExactIn(address tokenIn, uint256 amountIn, uint256 minOut, address to, uint256 deadline)
+    external nonReentrant beforeDeadline(deadline) returns (uint256 amountOut)
 {
     bool zeroForOne;
-    <span class="kw">if</span> (tokenIn == address(token0)) zeroForOne = <span class="kw">true</span>;
-    <span class="kw">else if</span> (tokenIn != address(token1)) <span class="kw">revert</span> InvalidToken();
+    if (tokenIn == address(token0)) zeroForOne = true;
+    else if (tokenIn != address(token1)) revert InvalidToken();
 
-    (uint256 rIn, uint256 rOut) = zeroForOne
-        ? (reserve0, reserve1) : (reserve1, reserve0);
+    (uint256 rIn, uint256 rOut) = zeroForOne ? (reserve0, reserve1) : (reserve1, reserve0);
     amountOut = getAmountOut(amountIn, rIn, rOut);
-    <span class="c">// the caller's slippage limit is the sandwich's ceiling</span>
-    <span class="kw">if</span> (amountOut &lt; minOut) <span class="kw">revert</span> InsufficientOutput(amountOut, minOut);
+    if (amountOut &lt; minOut) revert InsufficientOutput(amountOut, minOut);
 
     uint256 kBefore = uint256(reserve0) * reserve1;
     IERC20(tokenIn).safeTransferFrom(msg.sender, address(this), amountIn);
     (zeroForOne ? token1 : token0).safeTransfer(to, amountOut);
     _sync();
-    <span class="kw">assert</span>(uint256(reserve0) * reserve1 &gt;= kBefore); <span class="c">// k never shrinks</span>
-    <span class="kw">emit</span> Swap(msg.sender, tokenIn, amountIn, amountOut, to);
+    assert(uint256(reserve0) * reserve1 &gt;= kBefore);
+    emit Swap(msg.sender, tokenIn, amountIn, amountOut, to);
 }</pre>
-  </section>
-
-  <footer>
-    <span>Built by <a href="https://sunghanpark.vercel.app">Sunghan Park</a>. Source, contracts and tests: <a href="https://github.com/hpark236/amm-lab">github.com/hpark236/amm-lab</a></span>
-    <span>Reserves via publicnode.com JSON-RPC · CEX price via Binance · educational, not trading advice</span>
-  </footer>
-</div>
+<p class="small">Tests: 8 contract tests (Hardhat) and 4 tests of the JavaScript math.</p>
+<p class="small muted">Reserves from publicnode.com, prices from Binance. Not audited. Source: <a href="https://github.com/hpark236/amm-lab">github.com/hpark236/amm-lab</a></p>
 
 <script type="module">
 import { getAmountOut, sandwich, impermanentLoss, quote, arbitrage } from './lib/amm.mjs';
@@ -241,10 +147,10 @@ async function loadPool() {
   const w = res.slice(2).match(/.{64}/g);
   st.r = [BigInt('0x' + w[0]), BigInt('0x' + w[1])];
   const p = st.pool;
-  $('#r0k').textContent = `Reserve · ${p.t[0][0]}`; $('#r1k').textContent = `Reserve · ${p.t[1][0]}`;
+  $('#r0k').textContent = `${p.t[0][0]} reserve`; $('#r1k').textContent = `${p.t[1][0]} reserve`;
   $('#r0').textContent = fmt(toF(st.r[0], p.t[0][1])); $('#r1').textContent = fmt(toF(st.r[1], p.t[1][1]));
   const s = sides();
-  const sp = priceBinA(); $('#spotk').textContent = `Spot · ${s.A[0]} per ${s.B[0]}`; $('#spot').textContent = sp >= 1 ? sp.toLocaleString('en-US', { maximumFractionDigits: 2 }) : sp.toPrecision(4);
+  const sp = priceBinA(); $('#spotk').textContent = `Price (${s.A[0]} per ${s.B[0]})`; $('#spot').textContent = sp >= 1 ? sp.toLocaleString('en-US', { maximumFractionDigits: 2 }) : sp.toPrecision(4);
   $('#blk').textContent = parseInt(blk, 16).toLocaleString('en-US');
 }
 async function loadCex() {
@@ -294,15 +200,15 @@ function drawCurve(x, y, a, out, inN, outN) {
   for (let i = 0; i <= 120; i++) { const xv = xmin + (xmax - xmin) * i / 120; path += (i ? 'L' : 'M') + sx(xv).toFixed(1) + ',' + sy(k / xv).toFixed(1); }
   const p0 = [sx(x), sy(y)], p1 = [sx(x + a), sy(y - out)];
   $('#curve').innerHTML = `
-    <line x1="${L}" y1="${H - B}" x2="${W - 10}" y2="${H - B}" stroke="#2a2f26"/><line x1="${L}" y1="10" x2="${L}" y2="${H - B}" stroke="#2a2f26"/>
-    <path d="${path}" fill="none" stroke="#8d9483" stroke-width="1.5"/>
-    <line x1="${p0[0]}" y1="${p0[1]}" x2="${p1[0]}" y2="${p1[1]}" stroke="#c6f05a" stroke-width="1" stroke-dasharray="4 4"/>
-    <circle cx="${p0[0]}" cy="${p0[1]}" r="5" fill="#e9ecdf"/><circle cx="${p1[0]}" cy="${p1[1]}" r="6" fill="#c6f05a"/>
-    <text x="${p0[0] + 9}" y="${p0[1] - 8}" fill="#e9ecdf" font-family="Fragment Mono" font-size="11">before</text>
-    <text x="${p1[0] + 9}" y="${p1[1] + 20}" fill="#c6f05a" font-family="Fragment Mono" font-size="11">after</text>
-    <text x="${W - 14}" y="${H - 10}" fill="#8d9483" font-family="Fragment Mono" font-size="10.5" text-anchor="end">${inN} in pool →</text>
-    <text x="16" y="20" fill="#8d9483" font-family="Fragment Mono" font-size="10.5">${outN}</text>
-    <text x="${W - 14}" y="24" fill="#8d9483" font-family="Fragment Mono" font-size="10.5" text-anchor="end">x · y = k</text>`;
+    <line x1="${L}" y1="${H - B}" x2="${W - 10}" y2="${H - B}" stroke="#ddd"/><line x1="${L}" y1="10" x2="${L}" y2="${H - B}" stroke="#ddd"/>
+    <path d="${path}" fill="none" stroke="#777" stroke-width="1.5"/>
+    <line x1="${p0[0]}" y1="${p0[1]}" x2="${p1[0]}" y2="${p1[1]}" stroke="#1a73e8" stroke-width="1" stroke-dasharray="4 4"/>
+    <circle cx="${p0[0]}" cy="${p0[1]}" r="5" fill="#111"/><circle cx="${p1[0]}" cy="${p1[1]}" r="6" fill="#1a73e8"/>
+    <text x="${p0[0] + 9}" y="${p0[1] - 8}" fill="#111" font-family="Menlo, monospace" font-size="11">before</text>
+    <text x="${p1[0] + 9}" y="${p1[1] + 20}" fill="#1a73e8" font-family="Menlo, monospace" font-size="11">after</text>
+    <text x="${W - 14}" y="${H - 10}" fill="#777" font-family="Menlo, monospace" font-size="10.5" text-anchor="end">${inN} in pool →</text>
+    <text x="16" y="20" fill="#777" font-family="Menlo, monospace" font-size="10.5">${outN}</text>
+    <text x="${W - 14}" y="24" fill="#777" font-family="Menlo, monospace" font-size="10.5" text-anchor="end">x · y = k</text>`;
 }
 
 // ---------- 02 sandwich ----------
@@ -327,18 +233,18 @@ function sand() {
   const sx = v => L + v / xm * (W - L - 16), sy = v => H - Bt - (v - ymn) / (ymx - ymn) * (H - Bt - 16);
   const bx = sx(toF(r.best.x, dA)), by = sy(net);
   $('#sandChart').innerHTML = `
-    <line x1="${L}" y1="${sy(0)}" x2="${W - 10}" y2="${sy(0)}" stroke="#2a2f26"/>
-    <polyline points="${pts.map(p => sx(p[0]).toFixed(1) + ',' + sy(p[1]).toFixed(1)).join(' ')}" fill="none" stroke="#c6f05a" stroke-width="2"/>
-    <line x1="${sx(xm)}" y1="12" x2="${sx(xm)}" y2="${H - Bt}" stroke="#ff7a66" stroke-dasharray="3 4"/>
-    <text x="${sx(xm) - 6}" y="${H - Bt - 8}" fill="#ff7a66" font-family="Fragment Mono" font-size="10.5" text-anchor="end">victim's limit</text>
-    <circle cx="${bx}" cy="${by}" r="5" fill="#e9ecdf"/>
-    <text x="${L}" y="${H - 8}" fill="#8d9483" font-family="Fragment Mono" font-size="10.5">front-run size (${A}) →</text>
-    <text x="${L - 6}" y="${sy(0) + 4}" fill="#8d9483" font-family="Fragment Mono" font-size="10" text-anchor="end">$0</text>
-    <text x="${L + 6}" y="${sy(ymx) + 4}" fill="#8d9483" font-family="Fragment Mono" font-size="10">${usd(ymx)}</text>`;
+    <line x1="${L}" y1="${sy(0)}" x2="${W - 10}" y2="${sy(0)}" stroke="#ddd"/>
+    <polyline points="${pts.map(p => sx(p[0]).toFixed(1) + ',' + sy(p[1]).toFixed(1)).join(' ')}" fill="none" stroke="#1a73e8" stroke-width="2"/>
+    <line x1="${sx(xm)}" y1="12" x2="${sx(xm)}" y2="${H - Bt}" stroke="#d93025" stroke-dasharray="3 4"/>
+    <text x="${sx(xm) - 6}" y="${H - Bt - 8}" fill="#d93025" font-family="Menlo, monospace" font-size="10.5" text-anchor="end">victim's limit</text>
+    <circle cx="${bx}" cy="${by}" r="5" fill="#111"/>
+    <text x="${L}" y="${H - 8}" fill="#777" font-family="Menlo, monospace" font-size="10.5">front-run size (${A}) →</text>
+    <text x="${L - 6}" y="${sy(0) + 4}" fill="#777" font-family="Menlo, monospace" font-size="10" text-anchor="end">$0</text>
+    <text x="${L + 6}" y="${sy(ymx) + 4}" fill="#777" font-family="Menlo, monospace" font-size="10">${usd(ymx)}</text>`;
   $('#ledger').innerHTML = `
-    <div><span class="n">1</span><span>Bot buys ${fmt(toF(r.best.got, dB), 6)} ${B} for ${fmt(toF(r.best.x, dA))} ${A}</span><span class="amber">front-run</span></div>
+    <div><span class="n">1</span><span>Bot buys ${fmt(toF(r.best.got, dB), 6)} ${B} for ${fmt(toF(r.best.x, dA))} ${A}</span><span class="muted">front-run</span></div>
     <div><span class="n">2</span><span>Victim gets ${fmt(toF(r.best.vOut, dB), 6)} ${B} instead of ${fmt(toF(fair, dB), 6)}</span><span class="red">−${((1 - Number(r.best.vOut) / Number(fair)) * 100).toFixed(2)}%</span></div>
-    <div><span class="n">3</span><span>Bot sells back for ${fmt(toF(r.best.back, dA))} ${A}</span><span class="lime">back-run</span></div>`;
+    <div><span class="n">3</span><span>Bot sells back for ${fmt(toF(r.best.back, dA))} ${A}</span><span class="muted">back-run</span></div>`;
 }
 
 // ---------- 03 arbitrage ----------
@@ -354,13 +260,13 @@ function arb() {
   const toUsd = v => A === 'WETH' ? v * (st.ethUsd || 2500) : v;
   if (!a) {
     $('#abT').textContent = 'none'; $('#abP').textContent = '$0'; $('#abN').textContent = fmt(spot, 6);
-    $('#abNote').textContent = `The pool is within the 0.3% fee band of the CEX price, so no trade is profitable before gas.`;
+    $('#abNote').textContent = `The pool is within 0.3% of the Binance price, so no trade is profitable.`;
     return;
   }
   $('#abT').textContent = a.side === 'buy0' ? `Pay ${fmt(a.in)} ${A}, get ${fmt(a.out, 6)} ${B}` : `Sell ${fmt(a.in, 6)} ${B} for ${fmt(a.out)} ${A}`;
   $('#abP').innerHTML = `<span class="lime">${usd(toUsd(a.profit))}</span>`;
   $('#abN').textContent = fmt(a.newPrice, 6);
-  $('#abNote').textContent = `Profit is before gas and CEX hedging costs. In practice searchers race for this in the first transaction of each block, and the LPs who supplied the stale price pay for it.`;
+  $('#abNote').textContent = `Profit is before gas and the cost of hedging on Binance. This profit comes out of liquidity providers' returns.`;
 }
 
 // ---------- 04 IL ----------
@@ -378,12 +284,12 @@ function il() {
   const ys = xs.map(m => impermanentLoss(1 + m / 100) * 100), ymin = Math.min(...ys);
   const sx = m => L + (m + 90) / 400 * (W - L - 16), sy = v => 14 + (v / ymin) * (H - B - 20);
   $('#ilChart').innerHTML = `
-    <line x1="${L}" y1="${sy(0)}" x2="${W - 10}" y2="${sy(0)}" stroke="#2a2f26"/><line x1="${sx(0)}" y1="10" x2="${sx(0)}" y2="${H - B}" stroke="#2a2f26"/>
-    <polyline points="${xs.map((m, i) => sx(m).toFixed(1) + ',' + sy(ys[i]).toFixed(1)).join(' ')}" fill="none" stroke="#ff7a66" stroke-width="2"/>
-    <circle cx="${sx(Math.max(-90, Math.min(310, mv)))}" cy="${sy(loss * 100)}" r="5" fill="#c6f05a"/>
-    <text x="${W - 14}" y="${H - 8}" fill="#8d9483" font-family="Fragment Mono" font-size="10.5" text-anchor="end">price change → (−90% to +310%)</text>
-    <text x="${L - 6}" y="${sy(ymin) + 4}" fill="#8d9483" font-family="Fragment Mono" font-size="10" text-anchor="end">${ymin.toFixed(0)}%</text>
-    <text x="${L - 6}" y="${sy(0) + 4}" fill="#8d9483" font-family="Fragment Mono" font-size="10" text-anchor="end">0%</text>`;
+    <line x1="${L}" y1="${sy(0)}" x2="${W - 10}" y2="${sy(0)}" stroke="#ddd"/><line x1="${sx(0)}" y1="10" x2="${sx(0)}" y2="${H - B}" stroke="#ddd"/>
+    <polyline points="${xs.map((m, i) => sx(m).toFixed(1) + ',' + sy(ys[i]).toFixed(1)).join(' ')}" fill="none" stroke="#d93025" stroke-width="2"/>
+    <circle cx="${sx(Math.max(-90, Math.min(310, mv)))}" cy="${sy(loss * 100)}" r="5" fill="#1a73e8"/>
+    <text x="${W - 14}" y="${H - 8}" fill="#777" font-family="Menlo, monospace" font-size="10.5" text-anchor="end">price change → (−90% to +310%)</text>
+    <text x="${L - 6}" y="${sy(ymin) + 4}" fill="#777" font-family="Menlo, monospace" font-size="10" text-anchor="end">${ymin.toFixed(0)}%</text>
+    <text x="${L - 6}" y="${sy(0) + 4}" fill="#777" font-family="Menlo, monospace" font-size="10" text-anchor="end">0%</text>`;
 }
 
 async function refresh() {
