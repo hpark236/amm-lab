@@ -1,8 +1,8 @@
-# AMM Lab
+# cpamm-mev
 
 A Uniswap-V2-style constant-product pool in Solidity, and a browser lab that runs the same math on **live mainnet reserves**.
 
-**Live:** https://amm-lab.vercel.app
+**Live:** https://cpamm-mev.vercel.app
 
 ## The contract: `contracts/MiniPair.sol`
 

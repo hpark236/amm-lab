@@ -1,5 +1,5 @@
 {
-  "name": "amm-lab",
+  "name": "cpamm-mev",
   "version": "1.0.0",
   "private": true,
   "description": "A Uniswap-v2-style constant-product pool in Solidity, plus a browser lab for swaps, sandwich attacks, arbitrage and impermanent loss on live mainnet reserves",

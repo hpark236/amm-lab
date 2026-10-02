@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>AMM Lab</title>
+<title>cpamm-mev</title>
 <meta name="description" content="A Uniswap V2 style pool in Solidity, and a calculator for price impact, sandwich attacks, arbitrage and impermanent loss using live Uniswap V2 reserves.">
 <link rel="icon" href="data:,">
 <link rel="stylesheet" href="/style.css">
@@ -20,7 +20,7 @@ input[type=range]{width:100%;max-width:640px;padding:0;border:0}
 </style>
 </head>
 <body>
-<h1>AMM Lab</h1>
+<h1>cpamm-mev</h1>
 <p class="desc">A Uniswap V2 style liquidity pool written in Solidity, and a calculator that uses live reserves from Uniswap V2 on Ethereum mainnet to show price impact, sandwich attacks, arbitrage against Binance, and impermanent loss.</p>
 
 <div class="grid2">
@@ -113,7 +113,7 @@ input[type=range]{width:100%;max-width:640px;padding:0;border:0}
     emit Swap(msg.sender, tokenIn, amountIn, amountOut, to);
 }</pre>
 <p class="small">Tests: 8 contract tests (Hardhat) and 4 tests of the JavaScript math.</p>
-<p class="small muted">Reserves from publicnode.com, prices from Binance. Not audited. Source: <a href="https://github.com/hpark236/amm-lab">github.com/hpark236/amm-lab</a></p>
+<p class="small muted">Reserves from publicnode.com, prices from Binance. Not audited. Source: <a href="https://github.com/hpark236/cpamm-mev">github.com/hpark236/cpamm-mev</a></p>
 
 <script type="module">
 import { getAmountOut, sandwich, impermanentLoss, quote, arbitrage } from './lib/amm.mjs';
